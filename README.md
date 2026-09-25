@@ -92,6 +92,7 @@ PORT=5000
 
 # MongoDB Connection
 MONGO_URI=mongodb://localhost:27017/jansathi
+JWT_SECRET=replace_with_a_strong_random_secret
 # OR for MongoDB Atlas:
 # MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/jansathi
 

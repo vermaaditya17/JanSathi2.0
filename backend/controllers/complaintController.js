@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Complaint from '../models/Complaint.js';
 import aiService from '../services/aiService.js';
 import emailService from '../services/emailService.js';
@@ -6,6 +7,20 @@ import {
   calculateSLADeadline,
   determinePriority
 } from '../utils/helpers.js';
+
+const normalizeDepartment = (category) => {
+  const departmentMap = {
+    'Water Department': 'Water Supply',
+    'Electricity Department': 'Electricity',
+    'Road & Transport': 'Roads',
+    Sanitation: 'Waste Management',
+    'Health Department': 'Public Health',
+    'Public Services': 'General',
+    Other: 'General'
+  };
+
+  return departmentMap[category?.trim()] || 'General';
+};
 
 /**
  * Lodge a new complaint
@@ -16,13 +31,11 @@ export const lodgeComplaint = async (req, res) => {
       title,
       description,
       language = 'en',
-      location,
       state,
       district,
       imageUrl
     } = req.body;
 
-    // Validation
     if (!title || !description || !state || !district) {
       return res.status(400).json({
         success: false,
@@ -30,58 +43,51 @@ export const lodgeComplaint = async (req, res) => {
       });
     }
 
-    // Generate tracking ID
     const trackingId = generateTrackingId();
-
-    // Call AI service to analyze complaint
     let aiAnalysis;
+
     try {
       const aiResult = await aiService.analyzeComplaint(
         `${title}\n${description}`,
         language
       );
 
-      if (!aiResult.success) {
-        console.error('AI Analysis failed:', aiResult);
-        aiAnalysis = {
-          intent: title,
-          category: 'Other',
-          priority: 'Medium',
-          keywords: [],
-          confidence: 50,
-          rawResponse: aiResult
-        };
-      } else {
-        aiAnalysis = aiResult.data;
-      }
+      aiAnalysis = aiResult.success ? aiResult.data : {
+        intent: title,
+        category: 'General',
+        priority: 'Medium',
+        keywords: [],
+        confidence: 50,
+        rawResponse: aiResult
+      };
     } catch (error) {
       console.error('AI Service Error:', error);
       aiAnalysis = {
         intent: title,
-        category: 'Other',
+        category: 'General',
         priority: 'Medium',
         keywords: [],
         confidence: 50,
-        error: error.message
+        rawResponse: { error: error.message }
       };
     }
 
-    // Determine if manual review is needed
     const needsManualReview = aiAnalysis.confidence < 75;
-
-    // Create complaint object
     const complaint = new Complaint({
       user: req.user._id,
+      citizenMetadata: {
+        name: req.user.name,
+        phone: req.user.mobile,
+        email: req.user.email,
+        aadhaar: req.user.aadhaar
+      },
       trackingId,
       title,
       description,
       language,
-      location: location || undefined,
       state,
       district,
       imageUrl,
-      
-      // AI Analysis
       aiAnalysis: {
         intent: aiAnalysis.intent,
         category: aiAnalysis.category,
@@ -89,45 +95,31 @@ export const lodgeComplaint = async (req, res) => {
         confidence: aiAnalysis.confidence,
         rawResponse: aiAnalysis.rawResponse
       },
-      
-      // Smart Routing
-      department: aiAnalysis.category || 'Other',
+      department: normalizeDepartment(aiAnalysis.category),
       priority: aiAnalysis.priority || 'Medium',
       priorityReason: aiAnalysis.priorityReason || 'Standard processing',
       routingConfidence: aiAnalysis.confidence,
       needsManualReview,
       manualReviewReason: needsManualReview ? 'Low confidence AI classification' : undefined,
-      
-      // SLA
       expectedResolutionDate: calculateSLADeadline(aiAnalysis.priority || 'Medium'),
-      
-      // Initial status
-      status: needsManualReview ? 'Under Review' : 'Assigned',
-      
-      // Action log
+      status: 'Pending',
       actionLog: [{
-        action: needsManualReview ? 'Created' : 'Assigned',
-        remarks: needsManualReview ? 'Awaiting manual review' : 'Auto-assigned by AI',
+        action: 'Created',
+        remarks: needsManualReview ? 'Awaiting manual review' : 'Complaint submitted',
         timestamp: new Date()
       }]
     });
 
     await complaint.save();
 
-    // Send confirmation email
     try {
-      await emailService.sendComplaintConfirmation(
-        req.user.email,
-        trackingId,
-        {
-          name: req.user.name,
-          department: complaint.department,
-          priority: complaint.priority,
-          expectedResolution: complaint.priority === 'High' ? '24-48 hours' :
-                             complaint.priority === 'Medium' ? '48-72 hours' :
-                             'Normal queue'
-        }
-      );
+      await emailService.sendComplaintConfirmation(req.user.email, trackingId, {
+        name: req.user.name,
+        department: complaint.department,
+        priority: complaint.priority,
+        expectedResolution: complaint.priority === 'High' ? '24-48 hours' :
+          complaint.priority === 'Medium' ? '48-72 hours' : 'Normal queue'
+      });
     } catch (error) {
       console.error('Failed to send confirmation email:', error);
     }
@@ -135,6 +127,7 @@ export const lodgeComplaint = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: 'Complaint lodged successfully',
+      trackingId: complaint.trackingId,
       complaint: {
         trackingId: complaint.trackingId,
         status: complaint.status,
@@ -203,7 +196,7 @@ export const getMyComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(limit * 1)
       .skip((page - 1) * limit)
-      .select('trackingId title status priority department expectedResolutionDate createdAt')
+      .select('trackingId title status priority department expectedResolutionDate resolvedAt createdAt')
       .lean();
 
     const total = await Complaint.countDocuments(filter);
@@ -222,6 +215,65 @@ export const getMyComplaints = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error fetching complaints: ' + error.message
+    });
+  }
+};
+
+/**
+ * Mark a complaint as resolved (admin)
+ */
+export const resolveComplaint = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid complaint ID'
+      });
+    }
+
+    const complaint = await Complaint.findById(id);
+
+    if (!complaint) {
+      return res.status(404).json({
+        success: false,
+        message: 'Complaint not found'
+      });
+    }
+
+    if (complaint.status === 'Resolved') {
+      return res.status(409).json({
+        success: false,
+        message: 'Complaint is already resolved',
+        complaint
+      });
+    }
+
+    const resolvedAt = new Date();
+    complaint.status = 'Resolved';
+    complaint.resolvedAt = resolvedAt;
+    complaint.resolvedBy = req.admin?._id || null;
+    complaint.actionLog.push({
+      action: 'Resolved',
+      updatedBy: req.admin?._id,
+      status: 'Resolved',
+      remarks: 'Complaint marked as resolved',
+      timestamp: resolvedAt
+    });
+
+    await complaint.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Complaint marked as resolved',
+      complaint
+    });
+  } catch (error) {
+    console.error('Resolve Complaint Error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error resolving complaint: ' + error.message
     });
   }
 };
@@ -404,6 +456,7 @@ export const updateComplaintStatus = async (req, res) => {
 
     if (status === 'Resolved') {
       complaint.resolvedAt = new Date();
+      complaint.resolvedBy = req.admin?._id || null;
       complaint.resolutionDetails = resolution || remarks;
     }
 

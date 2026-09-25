@@ -50,6 +50,11 @@ const AppContent = () => {
           element={!admin ? <AdminLogin /> : <Navigate to="/admin/dashboard" />} 
         />
 
+        <Route
+          path="/admin"
+          element={<Navigate to={admin ? '/admin/dashboard' : '/admin/login'} replace />}
+        />
+
         {/* --- PROTECTED ROUTES: Only for Admins --- */}
         <Route path="/admin/dashboard" element={admin ? <AdminDashboard /> : <Navigate to="/admin/login" />} />
 

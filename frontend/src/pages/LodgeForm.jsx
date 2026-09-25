@@ -176,24 +176,14 @@ const LodgeForm = () => {
   try {
     // ✅ FIX: Send ALL required fields
     const payload = {
-      // ✅ Citizen Metadata (Required)
-      name: formData.name,
-      phone: formData.phone,
-      email: formData.email,
-      aadhaar: formData.aadhaar,
-      address: formData.address || 'Not provided',
-      
       // ✅ Location (Required)
       state: formData.state,
       district: formData.district,
-      lat: location?.lat || null,
-      lng: location?.lng || null,
-      
       // ✅ Department & Grievance (Required)
       department: formData.department,
       title: `Grievance - ${formData.district}, ${formData.state}`,
       description: formData.description,
-      language: formData.language || 'en'
+      language: 'en'
     };
 
     console.log('📤 Submitting payload:', payload);
@@ -213,7 +203,7 @@ const LodgeForm = () => {
 
     if (response.data.success) {
       setSuccess('✅ Grievance lodged successfully!');
-      setTrackingId(response.data.trackingId);
+      setTrackingId(response.data.trackingId || response.data.complaint?.trackingId || '');
       
       // Show success for 3 seconds, then reset
       setTimeout(() => {

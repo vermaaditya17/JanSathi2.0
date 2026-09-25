@@ -1,8 +1,14 @@
 import jwt from 'jsonwebtoken';
 import { nanoid } from 'nanoid';
-import dotenv from 'dotenv';
+import '../config/env.js';
 
-dotenv.config();
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is required in backend/.env');
+  }
+
+  return process.env.JWT_SECRET;
+};
 
 /**
  * Generate JWT Token
@@ -10,7 +16,7 @@ dotenv.config();
 export const generateToken = (id, userType = 'user') => {
   return jwt.sign(
     { id, userType },
-    process.env.JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: process.env.JWT_EXPIRY || '30d' }
   );
 };
@@ -20,7 +26,7 @@ export const generateToken = (id, userType = 'user') => {
  */
 export const verifyToken = (token) => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET);
+    return jwt.verify(token, getJwtSecret());
   } catch (error) {
     return null;
   }

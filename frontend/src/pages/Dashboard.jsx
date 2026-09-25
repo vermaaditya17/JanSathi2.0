@@ -4,28 +4,28 @@ import axios from 'axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 const Dashboard = () => {
-  const { user } = useContext(AuthContext);
+  const { user, token } = useContext(AuthContext);
   const [complaints, setComplaints] = useState([]);
   const [chartData, setChartData] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.token) return;
+      if (!token) return;
       try {
-        const config = { headers: { Authorization: `Bearer ${user.token}` } };
-        const { data } = await axios.get('/api/complaints/admin/all', config);
-        setComplaints(data);
-        prepareChart(data);
+        const config = { headers: { Authorization: `Bearer ${token}` } };
+        const { data } = await axios.get('/api/complaints/my-complaints', config);
+        setComplaints(data.complaints || []);
+        prepareChart(data.complaints || []);
       } catch (err) {
         console.error("Fetch Error:", err);
       }
     };
     fetchData();
-  }, [user]);
+  }, [token]);
 
   const prepareChart = (data) => {
     const counts = {};
-    const key = user.role === 'National' ? 'state' : user.role === 'State' ? 'district' : 'departmentAssigned';
+    const key = 'department';
     data.forEach(item => {
       const val = item[key] || 'Not Assigned';
       counts[val] = (counts[val] || 0) + 1;
@@ -93,7 +93,7 @@ const Dashboard = () => {
               {complaints.map((c) => (
                 <tr key={c._id} className="hover:bg-blue-50 transition cursor-pointer">
                   <td className="px-6 py-4 font-mono font-bold text-blue-700">{c.trackingId}</td>
-                  <td className="px-6 py-4 font-medium">{c.citizen.name}</td>
+                  <td className="px-6 py-4 font-medium">{user?.name || 'Citizen'}</td>
                   <td className="px-6 py-4 text-center">
                     <span className={`px-3 py-1 rounded text-[10px] font-black uppercase ${
                       c.status === 'Pending' ? 'bg-orange-100 text-orange-600' : 

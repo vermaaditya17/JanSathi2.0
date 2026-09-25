@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import '../config/env.js';
 
 class AIService {
   constructor() {
@@ -19,7 +17,7 @@ class AIService {
 
         this.model =
           this.genAI.getGenerativeModel({
-            model: 'gemini-pro'
+            model: 'gemini-3.5-flash-lite'
           });
 
         console.log('Gemini AI initialized');
@@ -111,13 +109,12 @@ Return ONLY JSON in this format:
 
 Rules:
 - category should be one of:
-  Water Department
-  Electricity Department
-  Road & Transport
-  Sanitation
-  Health Department
-  Public Services
-  Other
+  Water Supply
+  Electricity
+  Roads
+  Waste Management
+  Public Health
+  General
 
 - priority should be:
   High
@@ -223,7 +220,7 @@ Rules:
     complaintText
   ) {
     let category =
-      'Public Services';
+      'General';
 
     let priority = 'Medium';
 
@@ -235,7 +232,7 @@ Rules:
       text.includes('pani')
     ) {
       category =
-        'Water Department';
+        'Water Supply';
     }
 
     if (
@@ -246,7 +243,7 @@ Rules:
       text.includes('light')
     ) {
       category =
-        'Electricity Department';
+        'Electricity';
     }
 
     if (
@@ -254,7 +251,7 @@ Rules:
       text.includes('sadak')
     ) {
       category =
-        'Road & Transport';
+        'Roads';
     }
 
     if (
@@ -264,7 +261,7 @@ Rules:
       text.includes('health')
     ) {
       category =
-        'Health Department';
+        'Public Health';
     }
 
     if (

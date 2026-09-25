@@ -1,7 +1,12 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
+import '../config/env.js';
 
 const generateToken = (id) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is required in backend/.env');
+  }
+
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 

@@ -54,20 +54,17 @@ export const AuthProvider = ({ children }) => {
   const persistAuthData = useCallback(
     (userData, authToken, adminData = null) => {
       try {
-        localStorage.setItem('userInfo_token', authToken);
+        const tokenKey = adminData ? 'adminInfo_token' : 'userInfo_token';
+        const userKey = adminData ? 'adminInfo_admin' : 'userInfo_user';
+
+        localStorage.setItem(tokenKey, authToken);
 
         if (userData) {
-          localStorage.setItem(
-            'userInfo_user',
-            JSON.stringify(userData)
-          );
+          localStorage.setItem(userKey, JSON.stringify(userData));
         }
 
         if (adminData) {
-          localStorage.setItem(
-            'userInfo_admin',
-            JSON.stringify(adminData)
-          );
+          localStorage.setItem(userKey, JSON.stringify(adminData));
         }
 
         axios.defaults.headers.common[
@@ -184,7 +181,7 @@ export const AuthProvider = ({ children }) => {
 
       try {
         const response = await axios.post(
-          `${API_URL}/auth/admin-login`,
+          `${API_URL.replace(/\/api$/, '')}/api/admin/login`,
           credentials
         );
 
@@ -234,6 +231,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem('userInfo_token');
     localStorage.removeItem('userInfo_user');
     localStorage.removeItem('userInfo_admin');
+    localStorage.removeItem('adminInfo_token');
+    localStorage.removeItem('adminInfo_admin');
 
     delete axios.defaults.headers.common['Authorization'];
   }, []);

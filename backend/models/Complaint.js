@@ -12,7 +12,7 @@ const actionLogSchema = new mongoose.Schema({
   action: { 
     type: String, 
     required: true,
-    enum: ['Created', 'Assigned', 'Updated', 'Resolved', 'Rejected', 'ManualReview', 'Escalated', 'Pending', 'In-Progress']
+    enum: ['Created', 'Assigned', 'Updated', 'Resolved', 'Rejected', 'ManualReview', 'Escalated', 'Pending', 'In-Progress', 'Under Review']
   },
   updatedBy: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -21,7 +21,7 @@ const actionLogSchema = new mongoose.Schema({
   remarks: { type: String },
   status: { 
     type: String,
-    enum: ['Pending', 'In-Progress', 'Resolved', 'Rejected'],
+    enum: ['Pending', 'Under Review', 'Assigned', 'In-Progress', 'Resolved', 'Rejected'],
     default: 'Pending'
   },
   timestamp: { 
@@ -142,14 +142,22 @@ const complaintSchema = new mongoose.Schema({
   // Status Tracking
   status: {
     type: String,
-    enum: ['Pending', 'In-Progress', 'Resolved', 'Rejected'],
+    enum: ['Pending', 'Under Review', 'Assigned', 'In-Progress', 'Resolved', 'Rejected'],
     default: 'Pending',
     index: true
   },
   
   // Resolution Information
   resolutionDetails: String,
-  resolvedAt: Date,
+  resolvedAt: {
+    type: Date,
+    default: null
+  },
+  resolvedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Admin',
+    default: null
+  },
   
   // Timestamps for SLAs
   submittedAt: {

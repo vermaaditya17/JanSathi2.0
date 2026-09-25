@@ -11,6 +11,8 @@ const AdminDashboard = () => {
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [resolvingId, setResolvingId] = useState(null);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [filterStatus, setFilterStatus] = useState('All');
   const navigate = useNavigate();
@@ -115,6 +117,39 @@ const AdminDashboard = () => {
     navigate('/admin/login');
   };
 
+  const handleResolve = async (complaint) => {
+    if (complaint.status === 'Resolved' || resolvingId) return;
+
+    try {
+      setResolvingId(complaint._id);
+      setError('');
+      setSuccess('');
+      const token = localStorage.getItem('adminInfo_token');
+      const response = await axios.patch(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/complaints/${complaint._id}/resolve`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        const updatedComplaint = response.data.complaint;
+        const updatedComplaints = complaints.map(item =>
+          item._id === updatedComplaint._id ? updatedComplaint : item
+        );
+        setComplaints(updatedComplaints);
+        calculateStats(updatedComplaints);
+        setSelectedComplaint(current =>
+          current?._id === updatedComplaint._id ? updatedComplaint : current
+        );
+        setSuccess('Complaint marked as resolved.');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error resolving complaint');
+    } finally {
+      setResolvingId(null);
+    }
+  };
+
   const filteredComplaints = filterStatus === 'All' 
     ? complaints 
     : complaints.filter(c => c.status === filterStatus);
@@ -166,6 +201,11 @@ const AdminDashboard = () => {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <span className="text-red-700">{error}</span>
+          </div>
+        )}
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+            {success}
           </div>
         )}
 
@@ -328,13 +368,30 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            <button
-                              onClick={() => setSelectedComplaint(complaint)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition flex items-center gap-2 mx-auto"
-                            >
-                              <Eye className="w-4 h-4" />
-                              View
-                            </button>
+                            <div className="flex justify-center gap-2">
+                              <button
+                                onClick={() => setSelectedComplaint(complaint)}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition flex items-center gap-2"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View
+                              </button>
+                              {complaint.status === 'Resolved' ? (
+                                <span className="text-green-700 font-bold px-2 py-2 flex items-center gap-1">
+                                  <CheckCircle className="w-4 h-4" />
+                                  Resolved
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => handleResolve(complaint)}
+                                  disabled={resolvingId !== null}
+                                  className="bg-green-600 hover:bg-green-700 disabled:bg-green-300 text-white px-3 py-2 rounded-lg font-bold transition flex items-center gap-2"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                  {resolvingId === complaint._id ? 'Resolving...' : 'Mark as Resolved'}
+                                </button>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))

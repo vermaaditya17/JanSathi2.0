@@ -16,6 +16,7 @@ Create a `.env` file with:
 ```env
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/jansathi
+JWT_SECRET=replace_with_a_strong_random_secret
 GEMINI_API_KEY=paste_your_key_from_makersuite.google.com
 ```
 

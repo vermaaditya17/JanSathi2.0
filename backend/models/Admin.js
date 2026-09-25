@@ -88,17 +88,19 @@ const adminSchema = new mongoose.Schema({
 });
 
 // Password hashing middleware
-adminSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+// Password hashing middleware
+adminSchema.pre('save', async function () {
+  // 1. Removed 'next' from function arguments
+  if (!this.isModified('password')) return; // 2. Just return, don't return next()
+  
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
+    // 3. Removed next() here
   } catch (error) {
-    next(error);
+    throw error; // 4. Throw the error instead of passing it to next()
   }
 });
-
 // Method to compare passwords
 adminSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
